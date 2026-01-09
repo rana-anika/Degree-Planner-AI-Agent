@@ -1,10 +1,19 @@
-import { useState } from "react";
+import { useState, useRef, useEffect } from "react";
 
 export default function App() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [loading, setLoading] = useState(false);
   const [previousResponseId, setPreviousResponseId] = useState(null);
+
+  const chatRef = useRef(null);
+
+  useEffect(() => {
+    // auto-scroll to bottom
+    if (chatRef.current) {
+      chatRef.current.scrollTop = chatRef.current.scrollHeight;
+    }
+  }, [messages, loading]);
 
   async function send() {
     const text = input.trim();
@@ -18,11 +27,17 @@ export default function App() {
       const r = await fetch("/api/chat", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          message: text,
-          previousResponseId,
-        }),
+        body: JSON.stringify({ message: text, previousResponseId }),
       });
+
+      // IMPORTANT: show better error if server returned HTML instead of JSON
+      const contentType = r.headers.get("content-type") || "";
+      if (!contentType.includes("application/json")) {
+        const html = await r.text();
+        throw new Error(
+          `Backend did not return JSON. Got: ${contentType}. First chars: ${html.slice(0, 60)}`
+        );
+      }
 
       const data = await r.json();
       if (!r.ok) throw new Error(data?.error || "Request failed");
@@ -30,10 +45,7 @@ export default function App() {
       setMessages((m) => [...m, { role: "assistant", text: data.reply }]);
       setPreviousResponseId(data.previousResponseId);
     } catch (e) {
-      setMessages((m) => [
-        ...m,
-        { role: "assistant", text: `Error: ${e.message}` },
-      ]);
+      setMessages((m) => [...m, { role: "assistant", text: `Error: ${e.message}` }]);
     } finally {
       setLoading(false);
     }
@@ -45,51 +57,38 @@ export default function App() {
   }
 
   return (
-    <div style={{ maxWidth: 780, margin: "40px auto", fontFamily: "system-ui" }}>
-      <h2>Demo Agent</h2>
+    <div className="app">
+      <div className="shell">
+        <div className="header">
+          <h1 className="title">Demo Agent</h1>
+          <button className="btn" onClick={newChat}>New chat</button>
+        </div>
 
-      <button onClick={newChat} style={{ marginBottom: 12 }}>
-        New chat
-      </button>
+        <div className="chat" ref={chatRef}>
+          {messages.map((m, i) => (
+            <div key={i} className={`row ${m.role}`}>
+              <div className="bubble">{m.text}</div>
+            </div>
+          ))}
+          {loading && (
+            <div className="row assistant">
+              <div className="bubble">typing…</div>
+            </div>
+          )}
+        </div>
 
-      <div
-        style={{
-          border: "1px solid #ddd",
-          borderRadius: 10,
-          padding: 14,
-          minHeight: 360,
-          marginBottom: 12,
-          overflow: "auto",
-        }}
-      >
-        {messages.map((m, i) => (
-          <div key={i} style={{ margin: "10px 0" }}>
-            <b>{m.role === "user" ? "You" : "Agent"}:</b> {m.text}
-          </div>
-        ))}
-        {loading && (
-          <div>
-            <b>Agent:</b> typing…
-          </div>
-        )}
-      </div>
-
-      <div style={{ display: "flex", gap: 8 }}>
-        <input
-          value={input}
-          onChange={(e) => setInput(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && send()}
-          placeholder="Type a message…"
-          style={{
-            flex: 1,
-            padding: 10,
-            borderRadius: 10,
-            border: "1px solid #ddd",
-          }}
-        />
-        <button onClick={send} disabled={loading}>
-          Send
-        </button>
+        <div className="composer">
+          <input
+            className="input"
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && send()}
+            placeholder="Type a message…"
+          />
+          <button className="send" onClick={send} disabled={loading}>
+            Send
+          </button>
+        </div>
       </div>
     </div>
   );
