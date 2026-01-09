@@ -3,9 +3,8 @@ import { ChatKit, useChatKit } from "@openai/chatkit-react";
 function Chat() {
   const { control } = useChatKit({
     api: {
-      async getClientSecret(existingClientSecret) {
-        // If ChatKit asks to refresh and you already have one, return it
-        if (existingClientSecret) return existingClientSecret;
+      async getClientSecret(existing) {
+        if (existing) return existing;
 
         const res = await fetch("/api/chatkit-session", {
           method: "POST",
@@ -30,7 +29,7 @@ function Chat() {
 export default function App() {
   return (
     <div style={{ maxWidth: 1000, margin: "24px auto", padding: 16 }}>
-      <h2>Chat Agent (Workflow)</h2>
+      <h2>ChatKit Workflow Demo v2</h2>
       <Chat />
     </div>
   );
